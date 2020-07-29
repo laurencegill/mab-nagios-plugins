@@ -25,6 +25,7 @@ ST_CR=2
 ST_UK=3
 hostname="localhost"
 port=6379
+user="default"
 output_dir=/tmp
 secure=0
 
@@ -45,18 +46,19 @@ print_help() {
     echo "  -H/--hostname)"
     echo "     Defines the hostname. Default is: localhost"
     echo "  -P/--port)"
-    echo "     Defines the port. Default is: 80"
-	echo "  -p/--password)"
-    echo "     Name of the server's status page defined in the location"
-    echo "     directive of your nginx configuration. Default is:"
+    echo "     Defines the port. Default is: 6379"
+    echo "  -u/--user)"
+    echo "     Username. Default is "default" for redis v5 compatibility."
+    echo "  -p/--password)"
+    echo "     Password. Store this in a file, for example:"
+    echo "     -p \$(/usr/bin/cat /usr/local/etc/check_redis_auth)"
     echo "  -o/--output-directory)"
     echo "     Specifies where to write the tmp-file that the check creates."
     echo "     Default is: /tmp"
     echo "  -w/--warning)"
     echo "     Sets a warning level for used_memory. Default is: off"
     echo "  -c/--critical)"
-    echo "     Sets a critical level for used_memory. Default is:"
-    echo "     off"
+    echo "     Sets a critical level for used_memory. Default is: off"
     exit $ST_UK
 }
 
@@ -78,9 +80,14 @@ while test -n "$1"; do
             port=$2
             shift
             ;;
-		--password|-p)
-            secure=1
-			password=$2
+        --user|-u)
+            user=$2
+            shift
+            ;;
+        --password|-p)
+           secure=1
+           password=$2
+           shift
             ;;
         --output-directory|-o)
             output_dir=$2
@@ -150,14 +157,14 @@ get_status() {
     filename=${output_dir}/${PROGNAME}-${hostname}.1
 	if [ "$secure" = 1 ]
     then
-        redis-cli -h $hostname -p $port  -a $password info > ${filename}
+        redis-cli --no-auth-warning -h $hostname -p $port --user $user -a $password info > ${filename}
     else
-        redis-cli -h $hostname -p $port  info > ${filename}
+        redis-cli -h $hostname -p $port --user $user info > ${filename}
     fi
 }
 
 get_vals() {
-        used_memory=`grep used_memory ${filename} | grep -v human | awk -F: '{print $2}' | tr -d '\r'`
+        used_memory=`grep used_memory: ${filename} | grep -v human | awk -F: '{print $2}' | tr -d '\r'`
         used_memory_human=`grep used_memory_human ${filename} | awk -F: '{print $2}' | tr -d '\r'`
         changes_since_last_save=`grep changes_since_last_save ${filename} | awk -F: '{print $2}' | tr -d '\r'`
         connected_clients=`grep connected_clients ${filename} | awk -F: '{print $2}' | tr -d '\r'`
